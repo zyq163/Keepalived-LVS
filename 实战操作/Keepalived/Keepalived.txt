@@ -1,0 +1,115 @@
+Web1服务器
+
+设置Web1服务器网络参数、配置Web服务
+[root@web1 ~]# nmcli connection modify eth0 ipv4.method manual ipv4.addresses 192.168.4.100/24 connection.autoconnect yes
+[root@web1 ~]# nmcli connection up eth0
+[root@web1 ~]# echo "192.168.4.100" > /var/www/html/index.html
+[root@web1 ~]# systemctl restart httpd
+[root@web1 ~]# systemctl enable httpd
+
+安装Keepalived软件
+[root@web1 ~]# yum install -y keepalived
+
+修改web1服务器Keepalived配置文件
+[root@web1 ~]# vim /etc/keepalived/keepalived.conf
+global_defs {
+  notification_email {
+    admin@tarena.com.cn     #设置报警收件人邮箱
+  }
+  notification_email_from ka@localhost  #设置发件人
+  smtp_server 127.0.0.1                 #定义邮件服务器
+  smtp_connect_timeout 30
+  router_id  web1      #设置路由ID号（实验需要修改）
+}
+vrrp_instance VI_1 {
+  state MASTER          #主服务器为MASTER（备服务器需要修改为BACKUP）
+  interface eth0        #定义网络接口
+  virtual_router_id 51  #主备服务器VRID号必须一致
+  priority 100          #服务器优先级,优先级高优先获取VIP（实验需要修改）
+  advert_int 1
+  authentication {
+    auth_type pass
+    auth_pass 1111      #主备服务器密码必须一致
+  }
+  virtual_ipaddress {   #谁是主服务器谁获得该VIP（实验需要修改）
+     192.168.4.80 
+  }    
+}
+
+启动服务
+[root@web1 ~]# systemctl start keepalived
+
+配置防火墙和SELinux
+启动keepalived会自动添加一个drop的防火墙规则，需要清空！
+[root@web1 ~]# iptables -F
+[root@web1 ~]# setenforce 0
+
+登录两台Web服务器查看VIP信息
+[root@web1 ~]# ip addr show
+
+===============================================================================
+Web2服务器
+
+设置Web2服务器网络参数、配置Web服务
+[root@web2 ~]# nmcli connection modify eth0 ipv4.method manual ipv4.addresses 192.168.4.200/24 connection.autoconnect yes
+[root@web2 ~]# nmcli connection up eth0
+[root@web2 ~]# yum -y install httpd
+[root@web2 ~]# echo "192.168.4.200" > /var/www/html/index.html
+[root@web2 ~]# systemctl restart httpd
+
+安装Keepalived软件
+[root@web2 ~]# yum install -y keepalived
+
+修改web2服务器Keepalived配置文件
+[root@web2 ~]# vim /etc/keepalived/keepalived.conf
+global_defs {
+  notification_email {
+    admin@tarena.com.cn                 #设置报警收件人邮箱
+  }
+  notification_email_from ka@localhost  #设置发件人
+  smtp_server 127.0.0.1                 #定义邮件服务器
+  smtp_connect_timeout 30
+  router_id  web2       #设置路由ID号（实验需要修改）
+}
+vrrp_instance VI_1 {
+  state BACKUP          #备服务器为BACKUP（实验需要修改）
+  interface eth0        #定义网络接口
+  virtual_router_id 51  #主辅VRID号必须一致
+  priority 50           #服务器优先级（实验需要修改）
+  advert_int 1
+  authentication {
+     auth_type pass
+     auth_pass 1111     #主辅服务器密码必须一致
+  }
+  virtual_ipaddress {   #谁是主服务器谁配置VIP（实验需要修改）
+     192.168.4.80 
+   }   
+}
+
+启动服务
+[root@web2 ~]# systemctl start keepalived
+
+配置防火墙和SELinux
+启动keepalived会自动添加一个drop的防火墙规则，需要清空！
+[root@web2 ~]# iptables -F
+[root@web2 ~]# setenforce 0
+
+登录两台Web服务器查看VIP信息
+[root@web2 ~]# ip addr show
+
+===============================================================================
+proxy主机(客户端)
+
+配置proxy主机的网络参数
+[root@proxy ~]# nmcli connection modify eth0 ipv4.method manual ipv4.addresses 192.168.4.5/24 connection.autoconnect yes
+[root@proxy ~]# nmcli connection up eth0
+
+测试: 
+[root@proxy ~]# curl http://192.168.4.80
+
+
+
+
+
+
+
